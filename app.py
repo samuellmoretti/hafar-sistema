@@ -1,62 +1,100 @@
-from flask import Flask, render_template, request, redirect, url_for
-import sqlite3
-from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, send_file
-import sqlite3
-from datetime import datetime
+from datetime import datetime, date, time
 import io
-import os 
-from sqlalchemy import create_engine
-from reportlab.platypus import Image  # (platypus Image)
+import os
+import re
 
-# PDF + gráficos
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+import psycopg2
+from psycopg2.extras import DictCursor
+
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+)
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.lib.utils import ImageReader
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 
 app = Flask(__name__)
-DATABASE = "hafar.db"
+
 DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL)
 
-from reportlab.platypus import TableStyle
-from reportlab.lib import colors
 
-from reportlab.platypus import Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-styles = getSampleStyleSheet()
+# =========================
+# HELPERS DE BANCO
+# =========================
 
-p_cell = styles["BodyText"]
-p_cell.fontName = "Helvetica"
-p_cell.fontSize = 9
-p_cell.leading = 11
+def adapt_sql(sql: str) -> str:
+    """
+    Converte SQL estilo SQLite para PostgreSQL.
+    """
+    # strftime -> TO_CHAR
+    sql = sql.replace("strftime('%Y-%m', data_agendamento)", "TO_CHAR(data_agendamento, 'YYYY-MM')")
+    sql = sql.replace("strftime('%Y-%m', p.data_agendamento)", "TO_CHAR(p.data_agendamento, 'YYYY-MM')")
+    sql = sql.replace("strftime('%Y-%m', co.data)", "TO_CHAR(co.data, 'YYYY-MM')")
+    sql = sql.replace("strftime('%Y-%m', data)", "TO_CHAR(data, 'YYYY-MM')")
+    sql = sql.replace("strftime('%Y', data)", "TO_CHAR(data, 'YYYY')")
+    sql = sql.replace("strftime('%Y', data_agendamento)", "TO_CHAR(data_agendamento, 'YYYY')")
+    sql = sql.replace("strftime('%Y-%m', p.data_agendamento)=?", "TO_CHAR(p.data_agendamento, 'YYYY-MM')=%s")
 
-def table_style_clean(header=True):
-    style_cmds = [
-        ("GRID", (0,0), (-1,-1), 0.6, colors.HexColor("#D0D7DE")),
-        ("VALIGN", (0,0), (-1,-1), "TOP"),
-        ("ALIGN", (0,0), (-1,-1), "LEFT"),
-        ("LEFTPADDING", (0,0), (-1,-1), 8),
-        ("RIGHTPADDING", (0,0), (-1,-1), 8),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-    ]
+    # date(?) -> CAST(%s AS DATE)
+    sql = re.sub(r"date\(\s*\?\s*\)", "CAST(%s AS DATE)", sql)
 
-    if header:
-        style_cmds += [
-            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#F3F4F6")),  # cabeçalho cinza claro
-            ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#111827")),
-            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-        ]
+    # placeholders ? -> %s
+    sql = sql.replace("?", "%s")
 
-    return TableStyle(style_cmds)
+    # placeholders quebrados com % -> %s
+    sql = re.sub(r"(?<!%)%(?!s)", "%s", sql)
+
+    return sql
+
+
+class PGCursorWrapper:
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def execute(self, sql, params=None):
+        sql = adapt_sql(sql)
+        self.cursor.execute(sql, params or ())
+        return self  # permite c.execute(...).fetchall()
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+
+    def __getattr__(self, item):
+        return getattr(self.cursor, item)
+
+
+class PGConnectionWrapper:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def cursor(self):
+        return PGCursorWrapper(self.conn.cursor())
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.conn.close()
+
+    def __getattr__(self, item):
+        return getattr(self.conn, item)
+
+
+def get_db():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL não foi definida no Render.")
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=DictCursor)
+    return PGConnectionWrapper(conn)
 
 
 # =========================
@@ -64,119 +102,68 @@ def table_style_clean(header=True):
 # =========================
 
 def init_db():
-    with sqlite3.connect(DATABASE) as conn:
-        c = conn.cursor()
+    conn = get_db()
+    c = conn.cursor()
 
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS contratos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            numero_cnt TEXT,
-            nome_contrato TEXT,
-            contato TEXT,
-            telefone TEXT,
-            email TEXT,
-            endereco TEXT,
-            preventivas_mes INTEGER DEFAULT 1,
-            ativo INTEGER DEFAULT 1
-        )
-        """)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS contratos (
+        id SERIAL PRIMARY KEY,
+        numero_cnt TEXT,
+        nome_contrato TEXT,
+        contato TEXT,
+        telefone TEXT,
+        email TEXT,
+        endereco TEXT,
+        preventivas_mes INTEGER DEFAULT 1,
+        ativo INTEGER DEFAULT 1
+    )
+    """)
 
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS preventivas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            contrato_id INTEGER,
-            data_agendamento TEXT,
-            status TEXT DEFAULT 'Pendente'
-        )
-        """)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS preventivas (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER,
+        data_agendamento DATE,
+        status TEXT DEFAULT 'Pendente'
+    )
+    """)
 
-        # ✅ CORRETIVAS (tabela base)
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS corretivas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            contrato_id INTEGER,
-            data TEXT,
-            ocorrencia TEXT
-        )
-        """)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS corretivas (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER,
+        data DATE,
+        ocorrencia TEXT,
+        contato TEXT,
+        status TEXT DEFAULT 'Pendente'
+    )
+    """)
 
-        # ✅ MIGRAÇÃO: adiciona colunas se não existirem
-        try:
-            c.execute("ALTER TABLE corretivas ADD COLUMN contato TEXT")
-        except sqlite3.OperationalError:
-            pass
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS visitas_tecnicas (
+        id SERIAL PRIMARY KEY,
+        local TEXT,
+        contato TEXT,
+        data DATE,
+        hora TIME,
+        status TEXT DEFAULT 'Pendente',
+        observacao TEXT
+    )
+    """)
 
-        try:
-            c.execute("ALTER TABLE corretivas ADD COLUMN status TEXT DEFAULT 'Pendente'")
-        except sqlite3.OperationalError:
-            pass
+    conn.commit()
+    conn.close()
 
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS visitas_tecnicas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            local TEXT,
-            contato TEXT,
-            data TEXT,
-            hora TEXT,
-            status TEXT DEFAULT 'Pendente',
-            observacao TEXT
-        )
-        """)
 
-        conn.commit()
-
+# inicializa tabelas
 init_db()
 
 
 # =========================
-# CONEXÃO
+# ESTILOS / HELPERS PDF
 # =========================
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def make_pie_chart(concluidas, pendentes, title="Preventivas (Mês)"):
-    fig = plt.figure(figsize=(4.2, 3.2), dpi=160)
-    ax = fig.add_subplot(111)
-
-    values = [concluidas, pendentes]
-    labels = ["Concluídas", "Pendentes"]
-    ax.pie(values, labels=labels, autopct=lambda p: f"{int(round(p/100*sum(values)))}",
-           startangle=90)
-    ax.set_title(title)
-
-    buf = io.BytesIO()
-    plt.tight_layout()
-    plt.savefig(buf, format="png", transparent=True)
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
-def make_bar_chart(labels, series_a, series_b=None, title=""):
-    fig = plt.figure(figsize=(6.2, 3.2), dpi=160)
-    ax = fig.add_subplot(111)
-
-    x = range(len(labels))
-    ax.bar(x, series_a, label="Concluídas" if series_b is not None else "Qtd")
-
-    if series_b is not None:
-        ax.bar(x, series_b, bottom=series_a, label="Pendentes")
-
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(labels, rotation=0)
-    ax.set_title(title)
-    ax.legend()
-
-    buf = io.BytesIO()
-    plt.tight_layout()
-    plt.savefig(buf, format="png", transparent=True)
-    plt.close(fig)
-    buf.seek(0)
-    return buf
-
+styles = ge
 
 # =========================
 # HOME
@@ -246,7 +233,7 @@ def editar_contrato(id):
 
     c.execute("""
         UPDATE contratos
-        SET numero_cnt=?, nome_contrato=?, contato=?, telefone=?, email=?, endereco=?, preventivas_mes=?
+        SET numero_cnt=%, nome_contrato=%, contato=%, telefone=%, email=%, endereco=%, preventivas_mes=%
         WHERE id=?
     """, (numero_cnt, nome_contrato, contato, telefone, email, endereco, preventivas_mes, id))
 
@@ -260,7 +247,7 @@ def excluir_contrato(id):
     # Melhor prática: não apagar, só desativar
     conn = get_db()
     c = conn.cursor()
-    c.execute("UPDATE contratos SET ativo=0 WHERE id=?", (id,))
+    c.execute("UPDATE contratos SET ativo=0 WHERE id=%", (id,))
     conn.commit()
     conn.close()
     return redirect(url_for("contratos"))
@@ -289,20 +276,20 @@ def preventiva():
         limite = c.execute("""
             SELECT preventivas_mes
             FROM contratos
-            WHERE id=?
+            WHERE id=%
         """, (contrato_id,)).fetchone()[0]
 
         agendadas = c.execute("""
             SELECT COUNT(*)
             FROM preventivas
-            WHERE contrato_id=?
+            WHERE contrato_id=%
             AND strftime('%Y-%m', data_agendamento)=?
         """, (contrato_id, mes_data)).fetchone()[0]
 
         if agendadas < limite:
             c.execute("""
                 INSERT INTO preventivas (contrato_id, data_agendamento)
-                VALUES (?, ?)
+                VALUES (%, ?)
             """, (contrato_id, data_agendamento))
             conn.commit()
 
@@ -1463,8 +1450,8 @@ def relatorio_pdf():
         "relatorio_pdf.html",
         mes=mes,
         ano=ano,
-        meses=meseses if False else meses  # (ignora: só pra não dar erro se você colar errado)
+        meses=meses
     )
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
