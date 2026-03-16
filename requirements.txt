@@ -2,3 +2,5 @@ flask
 gunicorn
 reportlab
 matplotlib
+psycopg2-binary
+sqlalchemy
