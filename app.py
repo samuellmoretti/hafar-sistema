@@ -5,6 +5,8 @@ from flask import Flask, render_template, request, redirect, url_for, send_file
 import sqlite3
 from datetime import datetime
 import io
+import os 
+from sqlalchemy import create_engine
 from reportlab.platypus import Image  # (platypus Image)
 
 # PDF + gráficos
@@ -21,6 +23,8 @@ import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 DATABASE = "hafar.db"
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
 
 from reportlab.platypus import TableStyle
 from reportlab.lib import colors
