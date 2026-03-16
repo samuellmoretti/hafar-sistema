@@ -264,37 +264,92 @@ def preventiva():
 
     mes_atual = datetime.now().strftime("%Y-%m")
 
-    # =========================
-    # POST (AGENDAR)
-    # =========================
     if request.method == "POST":
         contrato_id = request.form["contrato_id"]
         data_agendamento = request.form["data_agendamento"]
-
         mes_data = data_agendamento[:7]
 
-        limite = c.execute("""
+        c.execute("""
             SELECT preventivas_mes
             FROM contratos
-            WHERE id=%
-        """, (contrato_id,)).fetchone()[0]
+            WHERE id=%s
+        """, (contrato_id,))
+        row = c.fetchone()
+        limite = int(row[0]) if row else 0
 
-        agendadas = c.execute("""
+        c.execute("""
             SELECT COUNT(*)
             FROM preventivas
-            WHERE contrato_id=%
-            AND strftime('%Y-%m', data_agendamento)=?
-        """, (contrato_id, mes_data)).fetchone()[0]
+            WHERE contrato_id=%s
+              AND TO_CHAR(data_agendamento, 'YYYY-MM')=%s
+        """, (contrato_id, mes_data))
+        agendadas = int(c.fetchone()[0])
 
         if agendadas < limite:
             c.execute("""
                 INSERT INTO preventivas (contrato_id, data_agendamento)
-                VALUES (%, ?)
+                VALUES (%s, %s)
             """, (contrato_id, data_agendamento))
             conn.commit()
 
         conn.close()
         return redirect(url_for("preventiva"))
+
+    c.execute("""
+        SELECT *
+        FROM contratos
+        WHERE ativo=1
+        ORDER BY nome_contrato ASC
+    """)
+    contratos = c.fetchall()
+
+    c.execute("""
+        SELECT p.*, c.nome_contrato
+        FROM preventivas p
+        LEFT JOIN contratos c ON p.contrato_id = c.id
+        ORDER BY p.data_agendamento DESC
+    """)
+    preventivas = c.fetchall()
+
+    c.execute("""
+        SELECT id, preventivas_mes
+        FROM contratos
+        WHERE ativo=1
+    """)
+    contratos_ativos = c.fetchall()
+
+    total_previstas = 0
+    total_concluidas = 0
+
+    for contrato in contratos_ativos:
+        contrato_id = contrato["id"]
+        limite = int(contrato["preventivas_mes"] or 0)
+        total_previstas += limite
+
+        c.execute("""
+            SELECT COUNT(*)
+            FROM preventivas
+            WHERE contrato_id=%s
+              AND status='Concluída'
+              AND TO_CHAR(data_agendamento, 'YYYY-MM')=%s
+        """, (contrato_id, mes_atual))
+        concluidas = int(c.fetchone()[0])
+
+        total_concluidas += concluidas
+
+    pendentes = total_previstas - total_concluidas
+    concluidos = total_concluidas
+
+    conn.close()
+
+    return render_template(
+        "preventiva.html",
+        contratos=contratos,
+        preventivas=preventivas,
+        concluidos=concluidos,
+        pendentes=pendentes,
+        mes_atual=mes_atual
+    )
 
     # =========================
     # CONTRATOS DISPONÍVEIS
