@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card p-4 shadow-lg col-md-6 mx-auto">
+<h4>Editar Preventiva</h4>
+
+<form method="POST">
+
+<input type="date" name="data" value="{{ preventiva[3] }}" class="form-control mb-2">
+
+<select name="status" class="form-select mb-3">
+<option {% if preventiva[4]=='Pendente' %}selected{% endif %}>Pendente</option>
+<option {% if preventiva[4]=='Feita' %}selected{% endif %}>Feita</option>
+</select>
+
+<button class="btn btn-success w-100">Salvar Alterações</button>
+
+</form>
+</div>
+
+{% endblock %}

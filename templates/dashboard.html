@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+
+	.dashboard-subtitle{
+	  color: rgba(255,255,255,0.78);
+	  font-size: 14px;     /* controla tamanho aqui */
+	  font-weight: 500;
+	  margin-top: 2px;
+	}
+	.dashboard-subtitle b{
+	  color: #00d4ff;
+	  font-weight: 800;
+	}
+  .kpi-card{
+    border-radius: 16px;
+    background: linear-gradient(145deg, #111827, #0b1220);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    padding: 16px;
+    transition: transform .25s ease, box-shadow .25s ease;
+    overflow: hidden;
+    position: relative;
+  }
+  .kpi-card:hover{
+    transform: translateY(-3px);
+    box-shadow: 0 18px 42px rgba(0,0,0,0.45);
+  }
+  .kpi-title{ color: rgba(255,255,255,0.7); font-size: 12px; letter-spacing: .8px; text-transform: uppercase;}
+  .kpi-value{ font-size: 34px; font-weight: 800; color: #fff; line-height: 1.0; }
+  .kpi-sub{ color: rgba(255,255,255,0.6); font-size: 12px; }
+  .pulse-dot{
+    width:10px;height:10px;border-radius:50%;
+    display:inline-block;margin-right:8px;
+    box-shadow: 0 0 0 rgba(255,255,255,0.0);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow: 0 0 0 0 rgba(255,255,255,0.0)}
+    70%{box-shadow: 0 0 0 12px rgba(255,255,255,0.06)}
+    100%{box-shadow: 0 0 0 0 rgba(255,255,255,0.0)}
+  }
+  .card-custom{
+    border-radius: 16px;
+  }
+  .fade-in{
+    animation: fadeIn .5s ease-out both;
+  }
+  @keyframes fadeIn{
+    from{opacity:0; transform: translateY(10px);}
+    to{opacity:1; transform: translateY(0);}
+  }
+  .mini-list td{ vertical-align: middle; }
+  .mini-list small{ color: rgba(255,255,255,0.65); }
+  .badge-soft{
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-weight: 700;
+    font-size: 12px;
+  }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-0">Dashboard</h2>
+    <div class="dashboard-subtitle">
+  Visão geral — mês atual: <b>{{ mes_atual }}</b>
+</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/preventiva" class="btn btn-success">Preventivas</a>
+    <a href="/corretiva" class="btn btn-warning">Corretivas</a>
+    <a href="/visita_tecnica" class="btn btn-info">Visitas</a>
+  </div>
+</div>
+
+<!-- ========================= -->
+<!-- KPIs -->
+<!-- ========================= -->
+<div class="row g-3 fade-in">
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-title">Preventivas previstas (mês)</div>
+      <div class="kpi-value" data-count="{{ total_previstas }}">0</div>
+      <div class="kpi-sub">preventivas/mês de contratos ativos</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-title">Concluídas (mês)</div>
+      <div class="kpi-value" data-count="{{ concluidas_mes }}">0</div>
+      <div class="kpi-sub">{{ percent_conclusao }}% de conclusão</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-title">Pendentes (mês)</div>
+      <div class="kpi-value" data-count="{{ pendentes_mes }}">0</div>
+      <div class="kpi-sub">Inclui ainda não agendadas</div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-title">Alertas</div>
+      <div class="d-flex flex-column gap-2 mt-2">
+        <div>
+		  <span class="pulse-dot" style="background:#ffca2c"></span>
+		  <b data-count="{{ atrasadas }}">0</b>
+		  <span class="kpi-alert-text">Atrasadas (agendadas)</span>
+		</div>
+
+		<div>
+		  <span class="pulse-dot" style="background:#8b5cf6"></span>
+		  <b data-count="{{ visitas_pendentes_mes }}">0</b>
+		  <span class="kpi-alert-text">Visitas pendentes (mês)</span>
+		</div>
+
+		<div>
+		  <span class="pulse-dot" style="background:#0dcaf0"></span>
+		  <b data-count="{{ sem_agendamento }}">0</b>
+		  <span class="kpi-alert-text">Sem agendamento</span>
+		</div>
+
+		<div>
+		  <span class="pulse-dot" style="background:#ff4d4d"></span>
+		  <b data-count="{{ corretivas_bo_ano }}">0</b>
+		  <span class="kpi-alert-text">BO no ano</span>
+		</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= -->
+<!-- GRÁFICOS -->
+<!-- ========================= -->
+<div class="row g-3 mt-2 fade-in">
+  <div class="col-md-4">
+    <div class="card-custom p-3">
+      <h5 class="mb-1">Preventivas (mês)</h5>
+      <small class="text-light">Concluídas x Pendentes (inclui não agendadas)</small>
+      <div class="mt-2">
+        <canvas id="donutPrev"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card-custom p-3">
+      <h5 class="mb-1">Concluídas (últimos 6 meses)</h5>
+      <small class="text-light">Tendência de execução</small>
+      <div class="mt-2">
+        <canvas id="barPrev6"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card-custom p-3">
+      <h5 class="mb-1">Visitas técnicas (ano)</h5>
+      <small class="text-light">Pendentes x Concluídas por mês</small>
+      <div class="mt-2">
+        <canvas id="barVisitasAno"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= -->
+<!-- LISTAS ÚTEIS -->
+<!-- ========================= -->
+<div class="row g-3 mt-2 fade-in">
+  <div class="col-md-6">
+    <div class="card-custom p-3">
+      <h5 class="mb-2">Próximas preventivas</h5>
+      <table class="table table-dark table-hover align-middle mini-list mb-0">
+        <thead>
+          <tr>
+            <th>Contrato</th>
+            <th>Data</th>
+            <th>Status</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in proximas_preventivas %}
+          <tr>
+            <td>{{ p.nome_contrato or "—" }}</td>
+            <td>{{ p.data_agendamento }}</td>
+            <td>
+              {% if p.status == "Concluída" %}
+                <span class="badge bg-success">Concluída</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Pendente</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="/preventiva" class="btn btn-sm btn-outline-light">Abrir</a>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if proximas_preventivas|length == 0 %}
+          <tr><td colspan="4" class="text-muted">Nenhuma preventiva pendente futura encontrada.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-2 fade-in">
+  <div class="col-md-12">
+    <div class="card-custom p-3">
+      <h5 class="mb-2">Visitas técnicas pendentes</h5>
+
+      <table class="table table-dark table-hover align-middle mini-list mb-0">
+        <thead>
+          <tr>
+            <th>Local</th>
+            <th>Contato</th>
+            <th>Data</th>
+            <th>Hora</th>
+            <th>Obs</th>
+            <th>Status</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in visitas_pendentes_lista %}
+          <tr>
+            <td>{{ v.local or "—" }}</td>
+            <td>{{ v.contato or "—" }}</td>
+            <td>{{ v.data }}</td>
+            <td class="hora-visita" data-hora="{{ v.hora }}">{{ v.hora }}</td>
+            <td><small>{{ (v.observacao or "")[:60] }}{% if (v.observacao or "")|length > 60 %}...{% endif %}</small></td>
+            <td class="text-end">
+              <a href="/visita_tecnica" class="btn btn-sm btn-outline-light">Abrir</a>
+            </td>
+            <td>
+			  <span class="badge bg-warning text-dark fw-bold">Pendente</span>
+			</td>
+          </tr>
+          {% endfor %}
+
+          {% if visitas_pendentes_lista|length == 0 %}
+          <tr><td colspan="6" class="text-muted">Nenhuma visita pendente no momento.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+  <div class="col-md-6">
+    <div class="card-custom p-3">
+      <h5 class="mb-2">Corretivas em alerta (BO / Pendente)</h5>
+      <table class="table table-dark table-hover align-middle mini-list mb-0">
+        <thead>
+          <tr>
+            <th>Contrato</th>
+            <th>Data</th>
+            <th>Status</th>
+            <th>Resumo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for co in ultimas_corretivas_alerta %}
+          <tr>
+            <td>{{ co.nome_contrato or "—" }}</td>
+            <td>{{ co.data }}</td>
+            <td>
+              {% if co.status == "BO" %}
+                <span class="badge bg-danger">BO</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Pendente</span>
+              {% endif %}
+            </td>
+            <td><small>{{ co.ocorrencia[:60] }}{% if co.ocorrencia|length > 60 %}...{% endif %}</small></td>
+          </tr>
+          {% endfor %}
+          {% if ultimas_corretivas_alerta|length == 0 %}
+          <tr><td colspan="4" class="text-muted">Sem BO/Pendentes recentes.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hora-visita{
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: .3px;
+    text-shadow: 0 0 6px rgba(0,0,0,.45);
+  }
+  .hora-vermelho{ color:#ff4d4d !important; }
+  .hora-laranja{ color:#ff9f43 !important; }
+  .hora-amarelo{ color:#ffd93d !important; }
+  .hora-verde-claro{ color:#7CFC00 !important; }
+  .hora-verde-escuro{ color:#2ecc71 !important; }
+</style>
+
+<script>
+  // =========================
+  // Animação de contagem nos KPIs
+  // =========================
+  function animateCount(el, to){
+    const duration = 700;
+    const start = 0;
+    const t0 = performance.now();
+    function tick(t){
+      const p = Math.min((t - t0) / duration, 1);
+      const val = Math.round(start + (to - start) * (1 - Math.pow(1-p, 3)));
+      el.textContent = val;
+      if(p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  document.querySelectorAll("[data-count]").forEach(el=>{
+    animateCount(el, parseInt(el.getAttribute("data-count") || "0"));
+  });
+
+  // =========================
+  // Charts
+  // =========================
+  const concluidasMes = {{ concluidas_mes }};
+  const pendentesMes = {{ pendentes_mes }};
+  const totalMes = concluidasMes + pendentesMes;
+
+  // Donut premium
+  const ctxDonut = document.getElementById("donutPrev").getContext("2d");
+  const gradOk = ctxDonut.createLinearGradient(0, 0, 0, 280);
+  gradOk.addColorStop(0, "#2ecc71");
+  gradOk.addColorStop(1, "#145a32");
+  const gradPend = ctxDonut.createLinearGradient(0, 0, 0, 280);
+  gradPend.addColorStop(0, "#ffd54f");
+  gradPend.addColorStop(1, "#b7950b");
+
+  const centerText = {
+    id: "centerText",
+    afterDraw(chart){
+      const {ctx} = chart;
+      ctx.save();
+      ctx.fillStyle = "#fff";
+      ctx.font = "800 28px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(totalMes, chart.width/2, chart.height/2 - 6);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "600 12px Segoe UI";
+      ctx.fillText("Total", chart.width/2, chart.height/2 + 18);
+      ctx.restore();
+    }
+  };
+
+  new Chart(ctxDonut, {
+    type: "doughnut",
+    data: {
+      labels: ["Concluídas", "Pendentes"],
+      datasets: [{
+        data: [concluidasMes, pendentesMes],
+        backgroundColor: [gradOk, gradPend],
+        borderWidth: 0,
+        hoverOffset: 18
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: "60%",
+      animation: { duration: 1200, easing: "easeOutExpo" },
+      plugins: {
+        legend: { position: "bottom", labels: { color: "white" } }
+      }
+    },
+    plugins: [centerText]
+  });
+
+  // Barras 6 meses
+  const labels6 = {{ labels_6|tojson }};
+  const concluidas6 = {{ concluidas_6|tojson }};
+  const ctxBar6 = document.getElementById("barPrev6").getContext("2d");
+
+  new Chart(ctxBar6, {
+    type: "bar",
+    data: {
+      labels: labels6,
+      datasets: [{
+        label: "Concluídas",
+        data: concluidas6,
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 900, easing: "easeOutQuart" },
+      plugins: { legend: { labels: { color: "white" } } },
+      scales: {
+        x: { ticks: { color: "rgba(255,255,255,0.7)" }, grid: { color: "rgba(255,255,255,0.08)" } },
+        y: { ticks: { color: "rgba(255,255,255,0.7)" }, grid: { color: "rgba(255,255,255,0.08)" } }
+      }
+    }
+  });
+
+  // Visitas ano (pendente x concluída por mês)
+  const labels12 = {{ labels_12|tojson }};
+  const vConc12 = {{ visitas_conc_12|tojson }};
+  const vPend12 = {{ visitas_pend_12|tojson }};
+  const ctxVis = document.getElementById("barVisitasAno").getContext("2d");
+
+  new Chart(ctxVis, {
+    type: "bar",
+    data: {
+      labels: labels12,
+      datasets: [
+        { label: "Concluídas", data: vConc12, borderWidth: 0 },
+        { label: "Pendentes", data: vPend12, borderWidth: 0 }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 900, easing: "easeOutQuart" },
+      plugins: { legend: { labels: { color: "white" } } },
+      scales: {
+        x: { stacked: true, ticks: { color: "rgba(255,255,255,0.7)" }, grid: { color: "rgba(255,255,255,0.08)" } },
+        y: { stacked: true, ticks: { color: "rgba(255,255,255,0.7)" }, grid: { color: "rgba(255,255,255,0.08)" } }
+      }
+    }
+  });
+</script>
+
+<script>
+  function minutesFromHHMM(hhmm){
+    if(!hhmm) return null;
+    const parts = hhmm.split(":");
+    if(parts.length !== 2) return null;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if(Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  function classByTime(hhmm){
+    const t = minutesFromHHMM(hhmm);
+    if(t === null) return "hora-verde-escuro";
+
+    if(t >= 0 && t <= 8*60) return "hora-vermelho";                 // 00:00–08:00
+    if(t >= 8*60 + 1 && t <= 9*60) return "hora-laranja";           // 08:01–09:00
+    if(t >= 9*60 + 1 && t <= 10*60) return "hora-amarelo";          // 09:01–10:00
+    if(t >= 10*60 + 1 && t <= 11*60 + 30) return "hora-verde-claro";// 10:01–11:30
+    return "hora-verde-escuro";                                     // 11:31+
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".hora-visita").forEach(el => {
+      const hhmm = el.getAttribute("data-hora") || el.textContent.trim();
+      el.classList.add(classByTime(hhmm));
+    });
+  });
+</script>
+
+{% endblock %}

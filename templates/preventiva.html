@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+
+/* ========================= */
+/* IGUALAR TAMANHO GRÁFICO E CALENDÁRIO */
+/* ========================= */
+.fc-daygrid-more-link {
+    display: none !important;
+}
+
+#grafico {
+    max-height: 480px;
+}
+
+#calendar {
+    height: 480px;
+}
+
+/* ========================= */
+/* CALENDÁRIO PREMIUM 2.0 */
+/* ========================= */
+
+#calendar {
+    font-family: 'Segoe UI', 'Inter', sans-serif;
+}
+
+/* Título do mês */
+.fc-toolbar-title {
+    font-size: 24px !important;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: capitalize;
+}
+
+/* Botões */
+.fc-button {
+    background: linear-gradient(145deg, #2c3e50, #34495e) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 6px 14px !important;
+    transition: all 0.3s ease !important;
+}
+
+.fc-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.5);
+}
+
+/* Células dos dias */
+.fc-daygrid-day {
+    background: linear-gradient(145deg, #2f3e46, #2a3940);
+    border: 1px solid #3c4f57;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.fc-daygrid-day:hover {
+    background: linear-gradient(145deg, #3b4f57, #344a52);
+    transform: scale(1.02);
+    z-index: 2;
+}
+
+/* NÚMERO DO DIA - AGORA BONITO */
+.fc-daygrid-day-number {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    padding: 6px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+
+/* Cabeçalho da semana */
+.fc-col-header-cell {
+    background-color: #24343c;
+    color: #00aaff;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+/* Dia atual SUPER elegante */
+.fc-day-today {
+    background: linear-gradient(145deg, rgba(46,204,113,0.25), rgba(46,204,113,0.05)) !important;
+    border: 1px solid #2ecc71 !important;
+    box-shadow: inset 0 0 15px rgba(46,204,113,0.3);
+}
+
+/* Eventos */
+.fc-event {
+    border-radius: 10px !important;
+    padding: 4px 6px !important;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+
+.fc-event:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.6);
+}
+
+</style>
+
+<h2>Preventiva</h2>
+
+
+
+<div class="card-custom mb-4">
+<form method="POST">
+<div class="row">
+<div class="col">
+<select name="contrato_id" class="form-select">
+{% for c in contratos %}
+<option value="{{c.id}}">{{c.nome_contrato}}</option>
+{% endfor %}
+</select>
+</div>
+<div class="col">
+<input type="date" name="data_agendamento" class="form-control" required>
+</div>
+<div class="col">
+<button class="btn btn-success">Agendar</button>
+</div>
+</div>
+</form>
+</div>
+
+<div class="row">
+<div class="col-md-6">
+<div class="card-custom">
+<canvas id="grafico"></canvas>
+</div>
+</div>
+
+<div class="col-md-6">
+<div class="card-custom">
+<div id="calendar"></div>
+</div>
+</div>
+</div>
+
+<div class="card-custom mt-4">
+<h5>Histórico</h5>
+
+<table class="table table-dark table-hover align-middle">
+<thead>
+<tr>
+    <th>Contrato</th>
+    <th>Data</th>
+    <th>Status</th>
+    <th class="text-center">✔</th>
+    <th class="text-center">⚙</th>
+</tr>
+</thead>
+
+<tbody>
+{% for p in preventivas %}
+<tr>
+    <td>{{p.nome_contrato}}</td>
+    <td>{{p.data_agendamento}}</td>
+    <td>
+        {% if p.status == "Concluída" %}
+            <span class="badge bg-success">Concluída</span>
+        {% else %}
+            <span class="badge bg-warning text-dark">Pendente</span>
+        {% endif %}
+    </td>
+
+    <td class="text-center">
+        {% if p.status != "Concluída" %}
+        <a href="/concluir_preventiva/{{p.id}}" 
+           class="btn btn-success btn-sm rounded-circle">
+           ✔
+        </a>
+        {% endif %}
+    </td>
+
+    <td class="text-center">
+        <button 
+            class="btn btn-primary btn-sm rounded-circle"
+            data-bs-toggle="modal"
+            data-bs-target="#editarModal{{p.id}}">
+            ✎
+        </button>
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+{% for p in preventivas %}
+<div class="modal fade" id="editarModal{{p.id}}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title">Editar Preventiva</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="/editar_preventiva/{{p.id}}">
+      <div class="modal-body">
+
+        <label>Data</label>
+        <input type="date" 
+               name="nova_data" 
+               class="form-control mb-3"
+               value="{{ p.data_agendamento[:10] }}"
+               required>
+
+        <hr>
+
+        <a href="/excluir_preventiva/{{p.id}}" 
+           class="btn btn-danger w-100"
+           onclick="return confirm('Deseja realmente excluir?')">
+           Excluir Preventiva
+        </a>
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">
+            Salvar Alterações
+        </button>
+      </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // =========================
+    // -------- GRÁFICO --------
+    // =========================
+
+    const ctx = document.getElementById('grafico').getContext('2d');
+
+    const concluidos = {{concluidos}};
+    const pendentes = {{pendentes}};
+    const total = concluidos + pendentes;
+
+    const gradConcluido = ctx.createLinearGradient(0, 0, 0, 400);
+    gradConcluido.addColorStop(0, '#2ecc71');
+    gradConcluido.addColorStop(1, '#145a32');
+
+    const gradPendente = ctx.createLinearGradient(0, 0, 0, 400);
+    gradPendente.addColorStop(0, '#ffd54f');
+    gradPendente.addColorStop(1, '#b7950b');
+
+    const shadowPlugin = {
+        id: 'shadow',
+        beforeDatasetDraw(chart) {
+            const {ctx} = chart;
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 8;
+        },
+        afterDatasetDraw(chart) {
+            chart.ctx.restore();
+        }
+    };
+
+    const customLabels = {
+        id: 'customLabels',
+        afterDraw(chart) {
+            const {ctx} = chart;
+            ctx.save();
+
+            chart.getDatasetMeta(0).data.forEach((element, index) => {
+                const valor = chart.data.datasets[0].data[index];
+                const pos = element.tooltipPosition();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(valor, pos.x, pos.y);
+            });
+
+            const centerX = chart.width / 2;
+            const centerY = chart.height / 2;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 26px Arial';
+            ctx.fillText(total, centerX, centerY - 8);
+
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#bbbbbb';
+            ctx.fillText('Total', centerX, centerY + 18);
+
+            ctx.restore();
+        }
+    };
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Concluídos','Pendentes'],
+            datasets: [{
+                data: [concluidos, pendentes],
+                backgroundColor: [gradConcluido, gradPendente],
+                borderWidth: 0,
+                hoverOffset: 20
+            }]
+        },
+        options: {
+            responsive: true,
+            cutout: '55%',
+            animation: {
+                duration: 1500,
+                easing: 'easeOutExpo'
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'white',
+                        font: { size: 14 }
+                    }
+                }
+            }
+        },
+        plugins: [shadowPlugin, customLabels]
+    });
+
+    // =========================
+    // ------ CALENDÁRIO ------- (EM PORTUGUÊS)
+    // =========================
+
+    var calendarEl = document.getElementById('calendar');
+
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+	    initialView: 'dayGridMonth',
+	    locale: 'pt-br',
+	    expandRows: true,
+	    dayMaxEventRows: false,
+	    headerToolbar: {
+	        left: 'prev,next today',
+	        center: 'title',
+	        right: ''
+	    },
+	    buttonText: {
+	        today: 'Hoje'
+	    },
+	    datesSet: function() {
+		    calendarEl.classList.add('fc-animar');
+		    setTimeout(() => {
+		        calendarEl.classList.remove('fc-animar');
+		    }, 300);
+		},
+		eventDidMount: function(info) {
+		    info.el.style.opacity = 0;
+		    info.el.style.transform = "translateY(10px)";
+		    setTimeout(() => {
+		        info.el.style.transition = "all 0.3s ease";
+		        info.el.style.opacity = 1;
+		        info.el.style.transform = "translateY(0)";
+		    }, 100);
+		},
+
+		events: [
+        {% for p in preventivas %}
+        {
+            title: '{{p.nome_contrato}}',
+            start: '{{p.data_agendamento}}',
+            backgroundColor: '{% if p.status == "Concluída" %}#198754{% else %}#ffc107{% endif %}',
+            borderColor: '{% if p.status == "Concluída" %}#198754{% else %}#ffc107{% endif %}'
+        },
+        {% endfor %}
+        ]
+    });
+
+    calendar.render();
+
+});
+</script>
+
+{% endblock %}

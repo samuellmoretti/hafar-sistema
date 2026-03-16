@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Corretiva</h2>
+
+<!-- ========================= -->
+<!-- CADASTRAR CORRETIVA -->
+<!-- ========================= -->
+<div class="card-custom mb-4">
+  <form method="POST">
+    <div class="row g-2">
+
+      <div class="col-md-4">
+        <select name="contrato_id" class="form-select">
+          <option value="">(Sem contrato)</option>
+          {% for ct in contratos %}
+          <option value="{{ ct.id }}">{{ ct.nome_contrato }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <input type="date" name="data" class="form-control" required>
+      </div>
+
+      <div class="col-md-3">
+        <input type="text" name="contato" class="form-control" placeholder="Contato (opcional)">
+      </div>
+
+      <div class="col-md-3">
+        <select name="status" class="form-select">
+          <option value="Pendente">Pendente</option>
+          <option value="Concluída">Concluída</option>
+          <option value="BO">BO</option>
+          <option value="OBS">OBS</option>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <textarea name="ocorrencia" class="form-control" rows="3"
+                  placeholder="Ocorrência / chamado" required></textarea>
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-warning">Registrar Corretiva</button>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<!-- ========================= -->
+<!-- HISTÓRICO -->
+<!-- ========================= -->
+<div class="card-custom mt-4">
+  <h5>Histórico de Corretivas</h5>
+
+  <table class="table table-dark table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Contrato</th>
+        <th>Data</th>
+        <th>Contato</th>
+        <th>Status</th>
+        <th>Ocorrência</th>
+        <th class="text-center">⚙</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for co in corretivas %}
+      <tr>
+        <td>{{ co.nome_contrato or "—" }}</td>
+        <td>{{ co.data }}</td>
+        <td>{{ co.contato or "—" }}</td>
+
+        <td>
+          {% if co.status == "Concluída" %}
+            <span class="badge bg-success">Concluída</span>
+          {% elif co.status == "BO" %}
+            <span class="badge bg-danger">BO</span>
+          {% elif co.status == "OBS" %}
+            <span class="badge bg-info text-dark">OBS</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pendente</span>
+          {% endif %}
+        </td>
+
+        <td style="max-width: 520px; white-space: normal;">
+          {{ co.ocorrencia }}
+        </td>
+
+        <td class="text-center">
+          <button type="button"
+                  class="btn btn-primary btn-sm rounded-circle"
+                  data-bs-toggle="modal"
+                  data-bs-target="#editarCorretiva{{ co.id }}">
+            ✎
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ========================= -->
+<!-- MODAIS (FORA DA TABELA) -->
+<!-- ========================= -->
+{% for co in corretivas %}
+<div class="modal fade" id="editarCorretiva{{ co.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title">Editar Corretiva</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="/editar_corretiva/{{ co.id }}">
+        <div class="modal-body">
+
+          <label>Data</label>
+          <input type="date" name="nova_data" class="form-control mb-3"
+                 value="{{ co.data[:10] }}" required>
+
+          <label>Contato</label>
+          <input type="text" name="novo_contato" class="form-control mb-3"
+                 value="{{ co.contato or '' }}">
+
+          <label>Status</label>
+          <select name="novo_status" class="form-select mb-3">
+            <option value="Pendente" {% if co.status=="Pendente" %}selected{% endif %}>Pendente</option>
+            <option value="Concluída" {% if co.status=="Concluída" %}selected{% endif %}>Concluída</option>
+            <option value="BO" {% if co.status=="BO" %}selected{% endif %}>BO</option>
+            <option value="OBS" {% if co.status=="OBS" %}selected{% endif %}>OBS</option>
+          </select>
+
+          <label>Ocorrência</label>
+          <textarea name="nova_ocorrencia" class="form-control mb-3" rows="4" required>{{ co.ocorrencia }}</textarea>
+
+          <hr>
+
+          <a href="/excluir_corretiva/{{ co.id }}"
+             class="btn btn-danger w-100"
+             onclick="return confirm('Deseja realmente excluir esta corretiva?')">
+            Excluir Corretiva
+          </a>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Salvar Alterações</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

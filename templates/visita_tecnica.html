@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Visita Técnica</h2>
+
+<div class="card-custom mb-4">
+<form method="POST">
+
+<input type="text" name="local" class="form-control mb-2" placeholder="Local da Visita" required>
+
+<input type="text" name="contato" class="form-control mb-2" placeholder="Nome do Contato (Opcional)">
+
+<input type="date" name="data" class="form-control mb-2" required>
+
+<input type="time" name="hora" class="form-control mb-2" required>
+
+<textarea name="observacao" class="form-control mb-2" placeholder="Observação"></textarea>
+
+<button class="btn btn-info">Agendar Visita</button>
+
+</form>
+</div>
+
+<div class="card-custom mt-4">
+  <h5>Histórico de Visitas Técnicas</h5>
+
+  <table class="table table-dark table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Local</th>
+        <th>Contato</th>
+        <th>Data</th>
+        <th>Hora</th>
+        <th>Obs.</th>
+        <th>Status</th>
+        <th class="text-center">✔</th>
+        <th class="text-center">⚙</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for v in visitas %}
+      <tr>
+	  <td>{{ v.local }}</td>
+	  <td>{{ v.contato }}</td>
+	  <td>{{ v.data }}</td>
+	  <td class="hora-visita" data-hora="{{ v.hora }}">{{ v.hora }}</td>
+
+	  <!-- OBS. (5ª coluna) -->
+	  <td style="max-width:260px;">
+	    {% if v.observacao %}
+	      <details class="obs-details">
+	        <summary class="btn btn-outline-light btn-sm obs-summary">Ver</summary>
+	        <div class="obs-box mt-2">
+	          <small>{{ v.observacao }}</small>
+	        </div>
+	      </details>
+	    {% else %}
+	      <span class="text-muted">—</span>
+	    {% endif %}
+	  </td>
+
+	  <!-- STATUS (6ª coluna) -->
+	  <td>
+	    {% if v.status == "Concluída" %}
+	      <span class="badge bg-success">Concluída</span>
+	    {% else %}
+	      <span class="badge bg-warning text-dark">Pendente</span>
+	    {% endif %}
+	  </td>
+
+	  <!-- CONCLUIR (7ª coluna) -->
+	  <td class="text-center">
+	    {% if v.status != "Concluída" %}
+	      <a href="/concluir_visita/{{ v.id }}" class="btn btn-success btn-sm rounded-circle">✔</a>
+	    {% endif %}
+	  </td>
+
+	  <!-- AÇÃO (8ª coluna) -->
+	  <td class="text-center">
+	    <button class="btn btn-primary btn-sm rounded-circle"
+	            data-bs-toggle="modal"
+	            data-bs-target="#editarVisita{{ v.id }}">
+	      ✎
+	    </button>
+	  </td>
+	</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- MODAIS FORA DA TABELA -->
+{% for v in visitas %}
+<div class="modal fade" id="editarVisita{{ v.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title">Editar Visita Técnica</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="/editar_visita/{{ v.id }}">
+        <div class="modal-body">
+
+          <label>Data</label>
+          <input type="date"
+                 name="nova_data"
+                 class="form-control mb-3"
+                 value="{{ v.data[:10] }}"
+                 required>
+
+          <label>Hora</label>
+          <input type="time"
+                 name="nova_hora"
+                 class="form-control mb-3"
+                 value="{{ v.hora }}"
+                 required>
+
+          <label>Observação</label>
+          <textarea name="nova_observacao" class="form-control mb-3" rows="3">{{ v.observacao or "" }}</textarea>
+
+          <hr>
+
+          <a href="/excluir_visita/{{ v.id }}"
+             class="btn btn-danger w-100"
+             onclick="return confirm('Deseja realmente excluir esta visita?')">
+            Excluir Visita
+          </a>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Salvar Alterações</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleObs(e, id, btn) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  // cria/pega a instância do Bootstrap Collapse
+  const instance = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+
+  // alterna manualmente
+  if (el.classList.contains('show')) {
+    instance.hide();
+    if (btn) btn.textContent = 'Ver';
+  } else {
+    instance.show();
+    if (btn) btn.textContent = 'Ocultar';
+  }
+}
+</script>
+
+<style>
+  .hora-visita{
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: .3px;
+  }
+
+  .hora-vermelho{ color:#FA8072 !important; }
+  .hora-laranja{ color:#f1ad44 !important; }
+  .hora-amarelo{ color:#fafc69 !important; }
+  .hora-verde-claro{ color:#87fc96 !important; }
+  .hora-verde-escuro{ color:#2ecc71 !important; }
+
+  .hora-visita{
+  text-shadow: 0 0 6px rgba(0,0,0,.45);
+}
+</style>
+
+<style>
+
+/* Observação estilo premium */
+.obs-details { display: inline-block; width: 100%; }
+.obs-details summary { list-style: none; cursor: pointer; }
+.obs-details summary::-webkit-details-marker { display: none; }
+
+/* Troca texto Ver/Ocultar automaticamente */
+.obs-details[open] .obs-summary::after { content: " Ocultar"; }
+.obs-details:not([open]) .obs-summary::after { content: ""; }
+
+/* Caixa */
+.obs-box{
+  background:#1f2a33;
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  padding:10px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+}
+
+/* Animação suave */
+.obs-details .obs-box{
+  animation: obsIn .18s ease-out;
+}
+@keyframes obsIn{
+  from { opacity:0; transform: translateY(6px); }
+  to { opacity:1; transform: translateY(0); }
+}
+</style>
+
+<script>
+  function minutesFromHHMM(hhmm){
+    if(!hhmm) return null;
+    const parts = hhmm.split(":");
+    if(parts.length !== 2) return null;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if(Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  function classByTime(hhmm){
+    const t = minutesFromHHMM(hhmm);
+    if(t === null) return "hora-verde-escuro";
+
+    // 00:00 -> 08:00 (inclusive) vermelho
+    if(t >= 0 && t <= (8*60)) return "hora-vermelho";
+
+    // 08:01 -> 09:00 laranja
+    if(t >= (8*60 + 1) && t <= (9*60)) return "hora-laranja";
+
+    // 09:01 -> 10:00 amarelo
+    if(t >= (9*60 + 1) && t <= (10*60)) return "hora-amarelo";
+
+    // 10:01 -> 11:30 verde claro
+    if(t >= (10*60 + 1) && t <= (11*60 + 30)) return "hora-verde-claro";
+
+    // 11:31 em diante verde escuro
+    return "hora-verde-escuro";
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".hora-visita").forEach(td => {
+      const hhmm = td.getAttribute("data-hora") || td.textContent.trim();
+      const cls = classByTime(hhmm);
+
+      // transforma o texto em "badge" colorido
+      td.innerHTML = `<span class="hora-badge ${cls}">${hhmm}</span>`;
+    });
+  });
+</script>
+
+{% endfor %}
+{% endblock %}

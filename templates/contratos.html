@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Contratos</h2>
+
+<!-- FORM CADASTRO (se você já tem, pode manter o seu) -->
+<div class="card-custom mb-4">
+  <form method="POST">
+    <div class="row g-2">
+      <div class="col-md-2">
+        <input name="numero_cnt" class="form-control" placeholder="Nº CNT">
+      </div>
+      <div class="col-md-4">
+        <input name="nome_contrato" class="form-control" placeholder="Nome do contrato" required>
+      </div>
+      <div class="col-md-3">
+        <input name="contato" class="form-control" placeholder="Contato">
+      </div>
+      <div class="col-md-3">
+        <input name="telefone" class="form-control" placeholder="Telefone">
+      </div>
+      <div class="col-md-4">
+        <input name="email" class="form-control" placeholder="E-mail">
+      </div>
+      <div class="col-md-6">
+        <input name="endereco" class="form-control" placeholder="Endereço">
+      </div>
+      <div class="col-md-2">
+        <input type="number" min="1" name="preventivas_mes" class="form-control" value="1">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-success">Cadastrar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- TABELA -->
+<div class="card-custom mt-4">
+  <h5>Contratos Ativos</h5>
+
+  <table class="table table-dark table-hover align-middle">
+    <thead>
+      <tr>
+        <th>CNT</th>
+        <th>Contrato</th>
+        <th>Contato</th>
+        <th>Telefone</th>
+        <th>Email</th>
+        <th>Endereço</th>
+        <th>Prev/mês</th>
+        <th class="text-center">⚙</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for c in contratos %}
+      <tr>
+        <td>{{ c.numero_cnt }}</td>
+        <td>{{ c.nome_contrato }}</td>
+        <td>{{ c.contato }}</td>
+        <td>{{ c.telefone }}</td>
+        <td>{{ c.email }}</td>
+        <td>{{ c.endereco }}</td>
+        <td>{{ c.preventivas_mes }}</td>
+
+        <td class="text-center">
+          <button type="button"
+                  class="btn btn-primary btn-sm rounded-circle"
+                  data-bs-toggle="modal"
+                  data-bs-target="#editarContrato{{ c.id }}">
+            ✎
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ✅ MODAIS FORA DA TABELA -->
+{% for c in contratos %}
+<div class="modal fade" id="editarContrato{{ c.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Editar contrato</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="/editar_contrato/{{ c.id }}">
+        <div class="modal-body">
+          <div class="row g-2">
+
+            <div class="col-md-3">
+              <label class="form-label">Nº CNT</label>
+              <input name="numero_cnt" class="form-control" value="{{ c.numero_cnt or '' }}">
+            </div>
+
+            <div class="col-md-9">
+              <label class="form-label">Nome do contrato</label>
+              <input name="nome_contrato" class="form-control" value="{{ c.nome_contrato or '' }}" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Contato</label>
+              <input name="contato" class="form-control" value="{{ c.contato or '' }}">
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Telefone</label>
+              <input name="telefone" class="form-control" value="{{ c.telefone or '' }}">
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">E-mail</label>
+              <input name="email" class="form-control" value="{{ c.email or '' }}">
+            </div>
+
+            <div class="col-md-9">
+              <label class="form-label">Endereço</label>
+              <input name="endereco" class="form-control" value="{{ c.endereco or '' }}">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Preventivas/mês</label>
+              <input type="number" min="1" name="preventivas_mes" class="form-control" value="{{ c.preventivas_mes or 1 }}">
+            </div>
+
+          </div>
+
+          <hr>
+
+          <a href="/excluir_contrato/{{ c.id }}"
+             class="btn btn-danger w-100"
+             onclick="return confirm('Deseja realmente desativar este contrato?')">
+            Excluir / Desativar
+          </a>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+          <button type="submit" class="btn btn-success">Salvar</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

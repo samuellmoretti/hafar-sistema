@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+  .hero{
+    border-radius: 18px;
+    background: radial-gradient(1200px 500px at 20% 0%, rgba(13,202,240,.18), transparent 55%),
+                radial-gradient(1200px 500px at 80% 0%, rgba(46,204,113,.16), transparent 55%),
+                linear-gradient(145deg, #0b1220, #111827);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+    padding: 18px 18px;
+    overflow:hidden;
+    position:relative;
+  }
+  .hero:before{
+    content:"";
+    position:absolute;
+    inset:-2px;
+    background: linear-gradient(90deg, rgba(13,202,240,.10), rgba(46,204,113,.10), rgba(255,193,7,.10));
+    filter: blur(26px);
+    opacity:.55;
+    z-index:0;
+  }
+  .hero > *{ position:relative; z-index:1; }
+
+  .subtle{
+    color: rgba(255,255,255,.72) !important;
+  }
+
+  .glass{
+    border-radius: 16px;
+    background: rgba(17,24,39,.7);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 12px 34px rgba(0,0,0,.35);
+    backdrop-filter: blur(10px);
+  }
+
+  .label{
+    font-size: 12px;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.65);
+    margin-bottom: 6px;
+  }
+
+  .form-control, .form-select{
+    background: rgba(0,0,0,.20) !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    color: #fff !important;
+    border-radius: 12px !important;
+    padding: 10px 12px !important;
+  }
+  .form-control:focus, .form-select:focus{
+    border-color: rgba(13,202,240,.55) !important;
+    box-shadow: 0 0 0 .2rem rgba(13,202,240,.15) !important;
+  }
+
+  .btn-pdf{
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    border: 0;
+    background: linear-gradient(145deg, #dc3545, #b02a37);
+    box-shadow: 0 14px 30px rgba(220,53,69,.22);
+    transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .btn-pdf:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 18px 44px rgba(220,53,69,.30);
+  }
+
+  .fade-in{
+    animation: fadeIn .5s ease-out both;
+  }
+  @keyframes fadeIn{
+    from{opacity:0; transform: translateY(10px);}
+    to{opacity:1; transform: translateY(0);}
+  }
+
+  .hint{
+    font-size: 12px;
+    color: rgba(255,255,255,.65);
+  }
+
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border-radius: 999px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.08);
+    color: rgba(255,255,255,.8);
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .chip .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:#0dcaf0;
+    box-shadow: 0 0 0 rgba(13,202,240,0);
+    animation:pulse 1.8s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(13,202,240,0)}
+    70%{box-shadow:0 0 0 12px rgba(13,202,240,.10)}
+    100%{box-shadow:0 0 0 0 rgba(13,202,240,0)}
+  }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3 fade-in">
+  <div>
+    <h2 class="mb-0">Relatório PDF</h2>
+    <small class="subtle">Gere um relatório mensal completo (preventivas, corretivas e visitas) com gráficos.</small>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a href="/dashboard" class="btn btn-outline-light">Voltar</a>
+    <span class="chip"><span class="dot"></span>HAFAR Manutenções</span>
+  </div>
+</div>
+
+<div class="hero fade-in">
+  <div class="row g-3 align-items-end">
+    <div class="col-md-8">
+      <div class="glass p-3">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="label">Mês</div>
+            <select class="form-select" id="mes" name="mes" form="formRelatorio">
+              {% for m, nome in meses %}
+                <option value="{{m}}" {% if m==mes %}selected{% endif %}>{{nome}}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <div class="label">Ano</div>
+            <input class="form-control" id="ano" type="number" name="ano" value="{{ano}}" min="2000" max="2100" form="formRelatorio">
+          </div>
+
+          <div class="col-12 d-flex align-items-center justify-content-between">
+            <small class="hint">Dica: o PDF será baixado e você voltará automaticamente para a Dashboard.</small>
+
+            <!-- FORM separado pra permitir target blank -->
+            <form id="formRelatorio" method="get" action="/relatorio_pdf" target="_blank" class="m-0">
+              <input type="hidden" name="download" value="1">
+              <button type="submit"
+                      class="btn btn-pdf"
+                      id="btnBaixar">
+                Baixar PDF
+              </button>
+            </form>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="glass p-3">
+        <div class="label">O que vai no PDF</div>
+        <ul class="mb-0 subtle" style="padding-left:18px;">
+          <li>Resumo do mês</li>
+          <li>Gráfico preventivas (rosquinha)</li>
+          <li>Gráfico corretivas (rosquinha)</li>
+          <li>Visitas do ano (barras empilhadas)</li>
+          <li>Tabelas completas do mês</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Opção 1 robusta: baixa em nova aba (target blank) e volta pra dashboard
+  document.getElementById("btnBaixar").addEventListener("click", function(){
+    setTimeout(function(){
+      window.location.href = "/dashboard";
+    }, 350);
+  });
+</script>
+
+{% endblock %}

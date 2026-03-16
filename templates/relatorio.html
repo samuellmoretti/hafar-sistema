@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-0">Relatório PDF</h2>
+    <small class="text-light">Escolha o mês/ano e baixe um PDF completo com gráficos e tabelas.</small>
+  </div>
+</div>
+
+<div class="card-custom p-3">
+  <form method="POST" action="/relatorio/pdf" class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label text-light">Mês/Ano</label>
+      <input type="month" name="mes_ref" class="form-control" value="{{ mes_padrao }}" required>
+    </div>
+    <div class="col-md-4">
+      <button class="btn btn-danger w-100">
+        Baixar Relatório (PDF)
+      </button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
