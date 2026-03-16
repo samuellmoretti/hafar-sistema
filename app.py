@@ -163,7 +163,7 @@ init_db()
 # ESTILOS / HELPERS PDF
 # =========================
 
-styles = ge
+styles = getSampleStyleSheet()
 
 # =========================
 # HOME
