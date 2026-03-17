@@ -92,8 +92,12 @@ class PGConnectionWrapper:
 
 def get_db():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL não foi definida no Render.")
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=DictCursor)
+        raise RuntimeError("DATABASE_URL não foi definida.")
+    conn = psycopg2.connect(
+        DATABASE_URL,
+        cursor_factory=DictCursor,
+        sslmode="require"
+    )
     return PGConnectionWrapper(conn)
 
 
@@ -275,15 +279,15 @@ def preventiva():
             WHERE id=%s
         """, (contrato_id,))
         row = c.fetchone()
-        limite = int(row[0]) if row else 0
+        limite = int(row["preventivas_mes"]) if row else 0
 
         c.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) AS total
             FROM preventivas
             WHERE contrato_id=%s
               AND TO_CHAR(data_agendamento, 'YYYY-MM')=%s
         """, (contrato_id, mes_data))
-        agendadas = int(c.fetchone()[0])
+        agendadas = int(c.fetchone()["total"])
 
         if agendadas < limite:
             c.execute("""
@@ -312,102 +316,21 @@ def preventiva():
     preventivas = c.fetchall()
 
     c.execute("""
-        SELECT id, preventivas_mes
+        SELECT COALESCE(SUM(preventivas_mes), 0) AS total_previstas
         FROM contratos
         WHERE ativo=1
     """)
-    contratos_ativos = c.fetchall()
+    total_previstas = int(c.fetchone()["total_previstas"])
 
-    total_previstas = 0
-    total_concluidas = 0
+    c.execute("""
+        SELECT COUNT(*) AS total_concluidas
+        FROM preventivas
+        WHERE status='Concluída'
+          AND TO_CHAR(data_agendamento, 'YYYY-MM')=%s
+    """, (mes_atual,))
+    concluidos = int(c.fetchone()["total_concluidas"])
 
-    for contrato in contratos_ativos:
-        contrato_id = contrato["id"]
-        limite = int(contrato["preventivas_mes"] or 0)
-        total_previstas += limite
-
-        c.execute("""
-            SELECT COUNT(*)
-            FROM preventivas
-            WHERE contrato_id=%s
-              AND status='Concluída'
-              AND TO_CHAR(data_agendamento, 'YYYY-MM')=%s
-        """, (contrato_id, mes_atual))
-        concluidas = int(c.fetchone()[0])
-
-        total_concluidas += concluidas
-
-    pendentes = total_previstas - total_concluidas
-    concluidos = total_concluidas
-
-    conn.close()
-
-    return render_template(
-        "preventiva.html",
-        contratos=contratos,
-        preventivas=preventivas,
-        concluidos=concluidos,
-        pendentes=pendentes,
-        mes_atual=mes_atual
-    )
-
-    # =========================
-    # CONTRATOS DISPONÍVEIS
-    # =========================
-    # MOSTRA SEMPRE TODOS OS CONTRATOS ATIVOS (não some)
-    contratos = c.execute("""
-        SELECT *
-        FROM contratos
-        WHERE ativo=1
-        ORDER BY nome_contrato ASC
-    """).fetchall()
-
-    # =========================
-    # LISTA PREVENTIVAS (TODAS)
-    # =========================
-    # LISTA PREVENTIVAS (ORDEM DECRESCENTE)
-    preventivas = c.execute("""
-        SELECT p.*, c.nome_contrato
-        FROM preventivas p
-        LEFT JOIN contratos c ON p.contrato_id = c.id
-        ORDER BY p.data_agendamento DESC
-    """).fetchall()
-
-    # =========================
-    # DADOS DO GRÁFICO (POR MANUTENÇÕES)
-    # =========================
-
-    mes_atual = datetime.now().strftime("%Y-%m")
-
-
-    contratos_ativos = c.execute("""
-        SELECT id, preventivas_mes
-        FROM contratos
-        WHERE ativo=1
-    """).fetchall()
-
-    total_previstas = 0
-    total_concluidas = 0
-
-    for contrato in contratos_ativos:
-
-        contrato_id = contrato["id"]
-        limite = int(contrato["preventivas_mes"] or 0)
-
-        total_previstas += limite
-
-        concluidas = c.execute("""
-            SELECT COUNT(*)
-            FROM preventivas
-            WHERE contrato_id=?
-            AND status='Concluída'
-            AND strftime('%Y-%m', data_agendamento)=?
-        """, (contrato_id, mes_atual)).fetchone()[0]
-
-        total_concluidas += concluidas
-
-    pendentes = total_previstas - total_concluidas
-    concluidos = total_concluidas
+    pendentes = max(total_previstas - concluidos, 0)
 
     conn.close()
 
