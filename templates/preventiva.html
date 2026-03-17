@@ -160,7 +160,7 @@
 {% for p in preventivas %}
 <tr>
     <td>{{p.nome_contrato}}</td>
-    <td>{{p.data_agendamento}}</td>
+    <td>{{ p.data_agendamento.strftime('%d/%m/%Y') if p.data_agendamento else '' }}</td>
     <td>
         {% if p.status == "Concluída" %}
             <span class="badge bg-success">Concluída</span>
@@ -208,7 +208,7 @@
         <input type="date" 
                name="nova_data" 
                class="form-control mb-3"
-               value="{{ p.data_agendamento[:10] }}"
+               value="{{ p.data_agendamento.strftime('%Y-%m-%d') if p.data_agendamento else '' }}"
                required>
 
         <hr>
@@ -370,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {% for p in preventivas %}
         {
             title: '{{p.nome_contrato}}',
-            start: '{{p.data_agendamento}}',
+            start: '{{ p.data_agendamento.strftime("%Y-%m-%d") if p.data_agendamento else "" }}',
             backgroundColor: '{% if p.status == "Concluída" %}#198754{% else %}#ffc107{% endif %}',
             borderColor: '{% if p.status == "Concluída" %}#198754{% else %}#ffc107{% endif %}'
         },
