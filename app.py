@@ -15,11 +15,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import cm
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-
 app = Flask(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -758,44 +753,81 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def _save_donut_chart(labels, values, colors, title, outpath):
-    # Rosquinha com total no centro
-    total = sum(values)
+    import os
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(5.2, 3.2), dpi=160)
+    os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
+    vals = []
+    for v in values:
+        try:
+            v = int(v)
+        except Exception:
+            v = 0
+        vals.append(max(0, v))
+
+    total = sum(vals)
+
+    fig = plt.figure(figsize=(6.2, 4.2), dpi=160)
+    ax = plt.gca()
+
+    ax.set_title(title, fontsize=11, fontweight="bold", pad=10)
+
+    if total <= 0:
+        ax.text(0.5, 0.52, "Sem dados", ha="center", va="center", fontsize=14, fontweight="bold")
+        ax.text(0.5, 0.40, "0", ha="center", va="center", fontsize=24, fontweight="bold")
+        ax.axis("off")
+        plt.tight_layout()
+        fig.savefig(outpath, transparent=False, facecolor="white")
+        plt.close(fig)
+        return
+
     wedges, _ = ax.pie(
-        values,
+        vals,
         labels=None,
         startangle=90,
         colors=colors,
-        wedgeprops=dict(width=0.42, edgecolor="white", linewidth=1),
+        wedgeprops=dict(width=0.38, edgecolor="white", linewidth=1.2),
         shadow=True
     )
 
-    # Números nas fatias
-    for w, v in zip(wedges, values):
-        if total == 0:
+    for w, v in zip(wedges, vals):
+        if v <= 0:
             continue
-        ang = (w.theta2 + w.theta1) / 2
-        x = 0.72 * np.cos(np.deg2rad(ang))
-        y = 0.72 * np.sin(np.deg2rad(ang))
-        ax.text(x, y, str(v), ha="center", va="center", fontsize=10, fontweight="bold", color="#111")
+        ang = (w.theta2 + w.theta1) / 2.0
+        x = 0.68 * np.cos(np.deg2rad(ang))
+        y = 0.68 * np.sin(np.deg2rad(ang))
+        ax.text(x, y, str(v), ha="center", va="center", fontsize=11, fontweight="bold", color="white")
 
-    # Total no centro
-    ax.text(0, 0.03, str(total), ha="center", va="center", fontsize=18, fontweight="bold")
-    ax.text(0, -0.14, "Total", ha="center", va="center", fontsize=9, color="#555")
+    ax.text(0, 0.05, str(total), ha="center", va="center", fontsize=22, fontweight="bold")
+    ax.text(0, -0.16, "Total", ha="center", va="center", fontsize=9, color="#666")
 
-    ax.set_title(title, fontsize=12, fontweight="bold")
-    ax.axis("equal")
+    ax.legend(
+        wedges,
+        [f"{l} ({v})" for l, v in zip(labels, vals)],
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.08),
+        ncol=2,
+        frameon=False,
+        fontsize=9
+    )
 
-    # Legenda
-    ax.legend(wedges, labels, loc="lower center", bbox_to_anchor=(0.5, -0.18), ncol=2, frameon=False)
-
+    ax.set_aspect("equal")
     plt.tight_layout()
     fig.savefig(outpath, transparent=False, facecolor="white")
     plt.close(fig)
 
 
 def _save_stacked_bar_visitas_ano(meses_labels, concluidas, pendentes, title, outpath):
+    import os
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    
     # Barras empilhadas (Concluídas + Pendentes) por mês
     fig, ax = plt.subplots(figsize=(7.2, 3.4), dpi=160)
 
