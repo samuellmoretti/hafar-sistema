@@ -107,7 +107,7 @@
           <input type="date"
                  name="nova_data"
                  class="form-control mb-3"
-                 value="{{ v.data[:10] }}"
+                 value="{{ v.data.strftime('%Y-%m-%d') if v.data else '' }}"
                  required>
 
           <label>Hora</label>
