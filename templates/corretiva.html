@@ -29,10 +29,10 @@
 
       <div class="col-md-3">
         <select name="status" class="form-select">
-          <option value="Pendente">Pendente</option>
-          <option value="Concluída">Concluída</option>
-          <option value="BO">BO</option>
-          <option value="OBS">OBS</option>
+          <option ="Pendente">Pendente</option>
+          <option ="Concluída">Concluída</option>
+          <option ="BO">BO</option>
+          <option ="OBS">OBS</option>
         </select>
       </div>
 
@@ -71,7 +71,7 @@
       {% for co in corretivas %}
       <tr>
         <td>{{ co.nome_contrato or "—" }}</td>
-        <td>{{ co.data }}</td>
+        <td>{{ co.data.strftime('%d/%m/%Y') if co.data else '' }}</td>
         <td>{{ co.contato or "—" }}</td>
 
         <td>
@@ -121,7 +121,7 @@
 
           <label>Data</label>
           <input type="date" name="nova_data" class="form-control mb-3"
-                 value="{{ co.data[:10] }}" required>
+                 value="{{ co.data.strftime('%Y-%m-%d') if co.data else '' }}" required>
 
           <label>Contato</label>
           <input type="text" name="novo_contato" class="form-control mb-3"
